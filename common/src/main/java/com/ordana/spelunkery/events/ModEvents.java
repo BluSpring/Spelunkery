@@ -6,12 +6,13 @@ import com.ordana.spelunkery.configs.CommonConfigs;
 import com.ordana.spelunkery.items.PortalFluidBottleItem;
 import com.ordana.spelunkery.recipes.GrindstonePolishingRecipe;
 import com.ordana.spelunkery.reg.*;
-import net.mehvahdjukaar.moonlight.api.client.util.ParticleUtil;
 import net.mehvahdjukaar.moonlight.api.util.Utils;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ItemParticleOption;
+import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -19,6 +20,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.stats.Stats;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.util.Mth;
 import net.minecraft.util.ParticleUtils;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.valueproviders.UniformInt;
@@ -210,7 +212,7 @@ public class ModEvents {
                         if (!player.getAbilities().instabuild) stack.shrink(1);
                     }
                     else if (state.is(ModBlocks.DIAMOND_GRINDSTONE.get()) && state.getValue(ModBlockProperties.DEPLETION) == 3 && polishingRecipe.isRequiresDiamondGrindstone() || (polishingRecipe.isRequiresDiamondGrindstone() && !state.is(ModBlocks.DIAMOND_GRINDSTONE.get()))) {
-                        ParticleUtil.spawnParticlesOnBlockFaces(level, pos, ParticleTypes.SMOKE, UniformInt.of(3, 5), -0.05f, 0.05f, false);
+                        spawnParticlesOnBlockFaces(level, pos, ParticleTypes.SMOKE, UniformInt.of(3, 5), -0.05f, 0.05f, false);
                         player.swing(hand);
                         level.playSound(player, pos, SoundEvents.SHIELD_BREAK, SoundSource.BLOCKS, 0.5F, 0.0F);
                         return InteractionResult.sidedSuccess(level.isClientSide);
@@ -306,7 +308,7 @@ public class ModEvents {
 
         //effects
         if (level.isClientSide()) {
-            ParticleUtil.spawnParticlesOnBlockFaces(level, pos, new ItemParticleOption(ParticleTypes.ITEM, itemStack), UniformInt.of(3, 5), -0.05f, 0.05f, false);
+            spawnParticlesOnBlockFaces(level, pos, new ItemParticleOption(ParticleTypes.ITEM, itemStack), UniformInt.of(3, 5), -0.05f, 0.05f, false);
             player.swing(hand);
         }
         level.playSound(null, pos, SoundEvents.GRINDSTONE_USE, SoundSource.BLOCKS, 0.5F, 0.0F);
@@ -404,5 +406,46 @@ public class ModEvents {
         }
 
         return itemStack;
+    }
+
+    // Code below adapted and modified from Moonlight API
+    // Section used: https://github.com/MehVahdJukaar/Moonlight/blob/1.20/common/src/main/java/net/mehvahdjukaar/moonlight/api/client/util/ParticleUtil.java#L153-L188
+    private static void spawnParticlesOnBlockFaces(Level level, BlockPos blockPos, ParticleOptions particleOptions,
+                                                   UniformInt uniformInt, float minSpeed, float maxSpeed, boolean perpendicular) {
+        RandomSource random = level.getRandom();
+
+        for (Direction direction : Direction.values()) {
+            int i = uniformInt.sample(random);
+
+            for (int j = 0; j < i; j++) {
+                Vec3 pos = blockPos.getCenter();
+
+                int stepX = direction.getStepX();
+                int stepY = direction.getStepY();
+                int stepZ = direction.getStepZ();
+
+                double x = pos.x + (stepX == 0 ? Mth.nextDouble(random, -0.5, 0.5) : stepX * 0.6);
+                double y = pos.y + (stepY == 0 ? Mth.nextDouble(random, -0.5, 0.5) : stepY * 0.6);
+                double z = pos.z + (stepZ == 0 ? Mth.nextDouble(random, -0.5, 0.5) : stepZ * 0.6);
+
+                double dx;
+                double dy;
+                double dz;
+
+                if (perpendicular) {
+                    dx = stepX * Mth.randomBetween(random, minSpeed, maxSpeed);
+                    dy = stepX * Mth.randomBetween(random, minSpeed, maxSpeed);
+                    dz = stepZ * Mth.randomBetween(random, minSpeed, maxSpeed);
+                } else {
+                    float diff = maxSpeed - minSpeed;
+
+                    dx = stepX == 0 ? minSpeed + diff * random.nextDouble() : 0.0;
+                    dy = stepY == 0 ? minSpeed + diff * random.nextDouble() : 0.0;
+                    dz = stepZ == 0 ? minSpeed + diff * random.nextDouble() : 0.0;
+                }
+
+                level.addParticle(particleOptions, x, y, z, dx, dy, dz);
+            }
+        }
     }
 }
